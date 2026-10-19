@@ -24,12 +24,18 @@ const taskSchema = new mongoose.Schema({
     },
     category: {
         type: String,
+        enum: ["General", "Work", "Personal", "Study", "Health", "Shopping", "Other"],
         default: "General",
         trim: true,
     },
     dueDate: {
         type: Date,
         default: null,
+    },
+    dueTime: {
+        type: String,
+        default: "",
+        match: [/^$|^(?:[01]\d|2[0-3]):[0-5]\d$/, "Due time must use HH:mm format"],
     },
 },
     {

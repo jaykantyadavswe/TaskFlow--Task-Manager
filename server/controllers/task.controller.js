@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 import Task from "../models/Task.js";
 
+const taskCategories = ["General", "Work", "Personal", "Study", "Health", "Shopping", "Other"];
+
 // GET /api/tasks
 export const getTasks = async (req, res) => {
     try {
@@ -45,7 +47,13 @@ export const getTaskById = async (req, res) => {
 // POST /api/tasks
 export const createTask = async (req, res) => {
     try {
-        const { title, description, priority, category, dueDate } = req.body;
+        if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+            return res.status(400).json({
+                success: false, message: "Task data must be a JSON object"
+            });
+        }
+
+        const { title, description, priority, category, dueDate, dueTime = "" } = req.body;
 
         if (typeof title !== 'string' || !title.trim()){
             return res.status(400).json({ 
@@ -53,12 +61,32 @@ export const createTask = async (req, res) => {
             });
         }
 
+        if ((description !== undefined && typeof description !== 'string')
+            || (category !== undefined && typeof category !== 'string')) {
+            return res.status(400).json({
+                success: false, message: "Description and category must be strings"
+            });
+        }
+
+        if (category !== undefined && !taskCategories.includes(category)) {
+            return res.status(400).json({
+                success: false, message: "Choose a valid task category"
+            });
+        }
+
+        if (typeof dueTime !== 'string' || (dueTime !== '' && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(dueTime))) {
+            return res.status(400).json({
+                success: false, message: "Due time must use HH:mm format"
+            });
+        }
+
         const task = await Task.create({
             title: title.trim(),
-            description: description?.trim() || "",
+            description: description?.trim() ?? "",
             priority: priority,
             category: category,
             dueDate: dueDate || null,
+            dueTime: dueDate ? dueTime : "",
         });
 
         res.status(201).json({ success: true, data: task });
@@ -84,7 +112,13 @@ export const updateTask = async (req, res) => {
             });
         }
 
-        const allowedFields = ['title', 'description', 'status', 'priority', 'category', 'dueDate'];
+        if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+            return res.status(400).json({
+                success: false, message: "Task data must be a JSON object"
+            });
+        }
+
+        const allowedFields = ['title', 'description', 'status', 'priority', 'category', 'dueDate', 'dueTime'];
         const updateData = {};
 
         for (const field of allowedFields) {
@@ -93,9 +127,36 @@ export const updateTask = async (req, res) => {
             }
         }
 
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({
+                success: false, message: "No valid task fields were provided"
+            });
+        }
+
         if(Object.hasOwn(updateData, 'title') && (typeof updateData.title !== 'string' || !updateData.title.trim())) {
             return res.status(400).json({ 
                 success: false, message: "A task title is required" 
+            });
+        }
+
+        if ((Object.hasOwn(updateData, 'description') && typeof updateData.description !== 'string')
+            || (Object.hasOwn(updateData, 'category') && typeof updateData.category !== 'string')) {
+            return res.status(400).json({
+                success: false, message: "Description and category must be strings"
+            });
+        }
+
+        if (Object.hasOwn(updateData, 'category') && !taskCategories.includes(updateData.category)) {
+            return res.status(400).json({
+                success: false, message: "Choose a valid task category"
+            });
+        }
+
+        if (Object.hasOwn(updateData, 'dueTime')
+            && (typeof updateData.dueTime !== 'string'
+                || (updateData.dueTime !== '' && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(updateData.dueTime)))) {
+            return res.status(400).json({
+                success: false, message: "Due time must use HH:mm format"
             });
         }
 
@@ -109,6 +170,10 @@ export const updateTask = async (req, res) => {
 
         if(Object.hasOwn(updateData, 'dueDate') && updateData.dueDate === '') {
             updateData.dueDate = null;
+        }
+
+        if (Object.hasOwn(updateData, 'dueDate') && !updateData.dueDate) {
+            updateData.dueTime = "";
         }
 
         const task = await Task.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
